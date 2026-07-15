@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Smart Community</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/" class="navbar-brand">
+    <div class="logo-icon">🌍</div>
+    <span class="brand-text">SmartCommunity</span>
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="/">Home</a></li>
+    <li><a href="/dashboard" class="active">Dashboard</a></li>
+    <li><a href="/add_issue">Report Issue</a></li>
+    <li><a href="/map">Map</a></li>
+    <li><a href="/volunteer">Volunteer</a></li>
+  </ul>
+</nav>
+
+<div class="container page-content">
+  <div class="page-header">
+    <h1 class="page-title">NGO Dashboard</h1>
+    <p class="page-subtitle">Real-time community issue analytics and resource overview</p>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card orange fade-in stagger-1">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-total">—</div>
+      <div class="stat-label">Total Issues</div>
+    </div>
+    <div class="stat-card red fade-in stagger-2">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-urgent">—</div>
+      <div class="stat-label">Urgent Issues</div>
+    </div>
+    <div class="stat-card blue fade-in stagger-3">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-volunteers">—</div>
+      <div class="stat-label">Volunteers</div>
+    </div>
+    <div class="stat-card green fade-in stagger-4">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-resolved">—</div>
+      <div class="stat-label">Resolved</div>
+    </div>
+    <div class="stat-card orange fade-in">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-affected">—</div>
+      <div class="stat-label">People Affected</div>
+    </div>
+    <div class="stat-card blue fade-in">
+      <div class="stat-icon"></div>
+      <div class="stat-value" id="s-assignments">—</div>
+      <div class="stat-label">Assignments</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="chart-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Issues by Severity</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-severity"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Issues by Category</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-category"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Volunteer Skills</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-skills"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Issues Table + Volunteers side by side -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
+    <!-- Recent Issues -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Issues</span>
+        <a href="/add_issue" class="btn btn-primary btn-sm">+ Add</a>
+      </div>
+      <div id="recent-issues">
+        <div class="loading-overlay"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+
+    <!-- Volunteer List -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Registered Volunteers</span>
+        <a href="/volunteer" class="btn btn-secondary btn-sm">Register</a>
+      </div>
+      <div id="volunteer-list">
+        <div class="loading-overlay"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- All Issues Table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">All Community Issues</span>
+      <div style="display:flex;gap:8px;">
+        <select class="form-control" id="filter-severity" style="width:auto">
+          <option value="">All Severity</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <select class="form-control" id="filter-priority" style="width:auto">
+          <option value="">All Priority</option>
+          <option value="high">Urgent</option>
+          <option value="normal">Normal</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrapper" id="issues-table-wrap">
+      <div class="loading-overlay"><div class="spinner"></div> Loading issues...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Modal -->
+<div class="modal-overlay" id="assign-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title"> Assign Volunteer</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="assign-issue-info" style="margin-bottom:1rem;padding:12px;background:var(--bg-3);border-radius:10px;font-size:0.85rem;color:var(--text-muted);"></div>
+    <div id="matched-volunteers">
+      <div class="loading-overlay"><div class="spinner"></div> Finding matches...</div>
+    </div>
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary btn-full" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/main.js"></script>
+<script>
+  let currentIssueId = null;
+
+  // Chart.js default theming
+  Chart.defaults.color = '#8b9ab0';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+  Chart.defaults.font.family = 'DM Sans';
+
+  // ============================================================
+  // Load dashboard data
+  // ============================================================
+  async function loadDashboard() {
+    const { data, ok } = await API.getStats();
+    if (!ok) { showToast('Failed to load stats', 'error'); return; }
+
+    // Fill stat cards
+    document.getElementById('s-total').textContent = data.total_issues;
+    document.getElementById('s-urgent').textContent = data.high_priority;
+    document.getElementById('s-volunteers').textContent = data.total_volunteers;
+    document.getElementById('s-resolved').textContent = data.resolved;
+    document.getElementById('s-affected').textContent = data.total_affected.toLocaleString();
+    document.getElementById('s-assignments').textContent = data.total_assignments;
+
+    // Render charts
+    renderSeverityChart(data.by_severity);
+    renderCategoryChart(data.by_category);
+    renderSkillChart(data.by_skill);
+
+    // Recent issues
+    renderRecentIssues(data.recent_issues);
+  }
+
+  // ============================================================
+  // Chart: Issues by Severity (Doughnut)
+  // ============================================================
+  function renderSeverityChart(data) {
+    const ctx = document.getElementById('chart-severity');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(data).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+          data: Object.values(data),
+          backgroundColor: ['#f43f5e', '#f59e0b', '#38bdf8'],
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // ============================================================
+  // Chart: Issues by Category (Bar)
+  // ============================================================
+  function renderCategoryChart(data) {
+    const ctx = document.getElementById('chart-category');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(data).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+          label: 'Issues',
+          data: Object.values(data),
+          backgroundColor: 'rgba(249,115,22,0.7)',
+          borderColor: 'rgba(249,115,22,1)',
+          borderWidth: 1,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ============================================================
+  // Chart: Volunteer Skills (Polar Area)
+  // ============================================================
+  function renderSkillChart(data) {
+    const ctx = document.getElementById('chart-skills');
+    const colors = ['#f97316','#38bdf8','#10b981','#f43f5e','#f59e0b','#a78bfa','#fb7185'];
+    new Chart(ctx, {
+      type: 'polarArea',
+      data: {
+        labels: Object.keys(data).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+          data: Object.values(data),
+          backgroundColor: colors.map(c => c + '99'),
+          borderColor: colors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 14, boxWidth: 12 } }
+        },
+        scales: {
+          r: { grid: { color: 'rgba(255,255,255,0.07)' }, ticks: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ============================================================
+  // Render recent issues in card list
+  // ============================================================
+  function renderRecentIssues(issues) {
+    const el = document.getElementById('recent-issues');
+    if (!issues.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No issues yet</p></div>';
+      return;
+    }
+    el.innerHTML = issues.map(issue => `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:10px 0;border-bottom:1px solid var(--border);gap:8px;">
+        <div>
+          <div style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:3px;">
+            ${categoryIcon(issue.category)} ${issue.title}
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">${issue.created_at}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          ${severityBadge(issue.severity)}
+          ${priorityBadge(issue.priority)}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ============================================================
+  // Load full issues table
+  // ============================================================
+  async function loadIssuesTable() {
+    const severity = document.getElementById('filter-severity').value;
+    const priority = document.getElementById('filter-priority').value;
+    const filters = {};
+    if (severity) filters.severity = severity;
+    if (priority) filters.priority = priority;
+
+    const wrap = document.getElementById('issues-table-wrap');
+    wrap.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Loading...</div>';
+
+    const { data: issues, ok } = await API.getIssues(filters);
+    if (!ok) { wrap.innerHTML = '<div class="alert alert-error">Failed to load</div>'; return; }
+    if (!issues.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><h3>No issues found</h3></div>';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Location</th>
+            <th>Severity</th>
+            <th>Priority</th>
+            <th>Affected</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${issues.map(issue => `
+            <tr>
+              <td style="color:var(--text-dim)">${issue.id}</td>
+              <td>
+                <strong>${categoryIcon(issue.category)} ${issue.title}</strong>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${issue.description?.slice(0,60) || ''}${issue.description?.length > 60 ? '...' : ''}</div>
+              </td>
+              <td style="font-size:0.85rem;">📍 ${issue.location}</td>
+              <td>${severityBadge(issue.severity)}</td>
+              <td>${priorityBadge(issue.priority)}</td>
+              <td><strong style="color:var(--accent)">${issue.people_affected}</strong></td>
+              <td>${statusBadge(issue.status)}</td>
+              <td>
+                <button class="btn btn-sm btn-primary" onclick="openAssign(${issue.id}, '${issue.title.replace(/'/g, "\\'")}')">
+                  🎯 Assign
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ============================================================
+  // Load volunteers
+  // ============================================================
+  async function loadVolunteers() {
+    const { data: volunteers, ok } = await API.getVolunteers();
+    const el = document.getElementById('volunteer-list');
+    if (!ok || !volunteers.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><p>No volunteers yet</p></div>';
+      return;
+    }
+    el.innerHTML = volunteers.map(v => `
+      <div style="display:flex;align-items:center;gap:10px;
+                  padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="width:36px;height:36px;background:var(--bg-3);border-radius:50%;
+                    display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">
+          ${skillIcon(v.skill)}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--text);">${v.name}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">📍 ${v.location}</div>
+        </div>
+        <span class="badge badge-low" style="flex-shrink:0;">${v.skill}</span>
+      </div>
+    `).join('');
+  }
+
+  // ============================================================
+  // Open assign modal with smart matches
+  // ============================================================
+  async function openAssign(issueId, issueTitle) {
+    currentIssueId = issueId;
+    document.getElementById('assign-issue-info').textContent = `Assigning volunteers for: "${issueTitle}"`;
+    document.getElementById('matched-volunteers').innerHTML =
+      '<div class="loading-overlay"><div class="spinner"></div> Finding best matches...</div>';
+    document.getElementById('assign-modal').classList.add('active');
+
+    const { data: matches, ok } = await API.matchVolunteers(issueId);
+    const el = document.getElementById('matched-volunteers');
+
+    if (!ok) { el.innerHTML = '<div class="alert alert-error">Failed to load matches</div>'; return; }
+    if (!matches.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:1.5rem"><p>No available volunteers found</p></div>';
+      return;
+    }
+
+    el.innerHTML = matches.map(v => `
+      <div style="display:flex;align-items:center;gap:10px;
+                  padding:10px;margin-bottom:6px;
+                  background:var(--bg-3);border-radius:10px;
+                  border:1px solid ${v.skill_matched ? 'rgba(16,185,129,0.3)' : 'var(--border)'}">
+        <span style="font-size:1.3rem;">${skillIcon(v.skill)}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--text);">${v.name}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">
+            ${v.skill} · 📍 ${v.location} · ${v.distance_km} km away
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:0.75rem;color:${v.skill_matched ? 'var(--success)' : 'var(--text-muted)'};margin-bottom:4px;">
+            ${v.skill_matched ? '✓ Skill Match' : '◌ Partial'} · Score: ${v.match_score}
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="doAssign(${v.id}, '${v.name.replace(/'/g, "\\'")}')">
+            Assign
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function doAssign(volunteerId, volunteerName) {
+    const { data, ok } = await API.assignVolunteer({ issue_id: currentIssueId, volunteer_id: volunteerId });
+    if (!ok) { showToast(data?.error || 'Assignment failed', 'error'); return; }
+    showToast(`✅ ${volunteerName} assigned successfully!`, 'success');
+    closeModal();
+    loadIssuesTable();
+    loadDashboard();
+  }
+
+  function closeModal() {
+    document.getElementById('assign-modal').classList.remove('active');
+  }
+
+  // Close modal on overlay click
+  document.getElementById('assign-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // Filter listeners
+  document.getElementById('filter-severity').addEventListener('change', loadIssuesTable);
+  document.getElementById('filter-priority').addEventListener('change', loadIssuesTable);
+
+  // Init
+  loadDashboard();
+  loadIssuesTable();
+  loadVolunteers();
+</script>
+</body>
+</html>
